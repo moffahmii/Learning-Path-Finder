@@ -63,6 +63,8 @@ Open `http://localhost:3000`. The health check is available at `http://localhost
 
 Deploy on Vercel or another Next.js host, then add `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` as server-side environment variables. Run the seed script once against the CognoDB instance before opening the hosted demo.
 
+Live demo: [learning-path-finder-beryl.vercel.app](https://learning-path-finder-beryl.vercel.app/)
+
 ## Screenshots
 
 The dashboard is designed for a desktop overview and collapses into a single-column trail and recommendation view on small screens. Capture the running app at `http://localhost:3000` after seeding; include the desktop and mobile captures in the final repository or submission email.
@@ -70,7 +72,7 @@ The dashboard is designed for a desktop overview and collapses into a single-col
 ## Submission checklist
 
 - **Repository:** [Add the final GitHub repository URL before emailing]
-- **Hosted demo:** [Add the Vercel or other hosting URL]
+- **Hosted demo:** [learning-path-finder-beryl.vercel.app](https://learning-path-finder-beryl.vercel.app/)
 - **Screen recording:** [Add a short recording link showing seed, recommendations, and Mark complete]
 - **Email:** send the repository and demo links to `hr@wexa.ai` with subject `CognoDB Assignment 2 - Moffahmii`.
 

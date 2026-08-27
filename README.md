@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pathfinder
 
-## Getting Started
+Pathfinder is a graph-powered learning companion for people building skills across a modern web stack. It reads a learner's completed courses, follows prerequisite relationships, and recommends the next courses that have been unlocked.
 
-First, run the development server:
+Built by [moffahmii](https://github.com/moffahmii) for the WEXA AI CognoDB take-home assignment.
+
+## Why a graph database?
+
+The useful question here is not "which courses has this user purchased?" It is "which courses become reachable after following prerequisite and skill relationships from this learner's completed work?" A graph keeps those paths explicit and makes multi-hop traversal a first-class query. In a relational schema, the same recommendation requires several joins, recursive CTEs, and careful handling of changing prerequisite depth. Graph relationships also let the product grow naturally toward skill-based paths and peer or role recommendations.
+
+## Data model
+
+```mermaid
+graph LR
+  U[User] -->|ENROLLED_IN {status}| C[Course]
+  C -->|REQUIRES| P[Course]
+  C -->|TEACHES| S[Skill]
+```
+
+`User.email` and `Course.id` are stable identifiers. Courses have `title` and `level`; skills have `name`. `ENROLLED_IN.status` currently records `completed` and leaves room for `in_progress` later.
+
+## Main graph query
+
+`src/app/api/recommendations/route.ts` uses a parameterized two-hop traversal:
+
+```cypher
+MATCH (u:User)-[:ENROLLED_IN]->(completed:Course)
+MATCH (nextCourse:Course)-[:REQUIRES]->(completed)
+WHERE NOT (u)-[:ENROLLED_IN]->(nextCourse)
+RETURN nextCourse
+```
+
+The production query also filters on `status = 'completed'`, returns the completed course that unlocked each result, and uses `$email` as a driver parameter. This is the graph-specific part of the application: it finds reachable next moves through relationships rather than copying a fixed course list into application code. The same route accepts `POST` with `{ email, courseId }` to `MERGE` a completed `ENROLLED_IN` relationship, then the UI reloads the traversal.
+
+## Run locally
+
+1. Create an account at [CognoDB Cloud](https://console.cognodb.com/signup), choose **Create instance**, select the free `c0` tier and a region, then wait for provisioning to finish.
+2. Copy the `bolt+s://...databases.cognodb.cloud` URI and the generated password for the `cognodb` user immediately. The password is shown once.
+3. Create `.env.local` from `.env.example` and fill in the three values. Never commit `.env.local`.
+4. Install dependencies and load the sample graph (12 courses, 5 skills, and 12 prerequisite relationships):
+
+```bash
+npm install
+node scripts/seed.js
+```
+
+5. Start the application:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. The health check is available at `http://localhost:3000/api/test`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/app/page.tsx` - Pathfinder dashboard and loading/error/empty states.
+- `src/app/api/recommendations/route.ts` - parameterized graph reads and enrollment writes.
+- `lib/neo4j.ts` - lazy CognoDB connection and connectivity verification.
+- `scripts/seed.js` - repeatable sample graph loader.
 
-## Learn More
+## Deployment
 
-To learn more about Next.js, take a look at the following resources:
+Deploy on Vercel or another Next.js host, then add `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` as server-side environment variables. Run the seed script once against the CognoDB instance before opening the hosted demo.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Screenshots
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The dashboard is designed for a desktop overview and collapses into a single-column trail and recommendation view on small screens. Capture the running app at `http://localhost:3000` after seeding; include the desktop and mobile captures in the final repository or submission email.
 
-## Deploy on Vercel
+## Submission checklist
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Repository:** [Add the final GitHub repository URL before emailing]
+- **Hosted demo:** [Add the Vercel or other hosting URL]
+- **Screen recording:** [Add a short recording link showing seed, recommendations, and Mark complete]
+- **Email:** send the repository and demo links to `hr@wexa.ai` with subject `CognoDB Assignment 2 - Moffahmii`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Requirements covered
+
+- Realistic seed data and repeatable loader in `scripts/seed.js`.
+- Labeled nodes, typed relationships, properties, and a Mermaid model diagram.
+- Parameterized Neo4j-driver Cypher, including multi-hop prerequisite traversal.
+- Read and write application flow with loading, empty, error, and refresh states.
+- Secrets loaded from environment variables and ignored by Git.

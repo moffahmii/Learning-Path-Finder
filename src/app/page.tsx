@@ -1,69 +1,332 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+
+const LEARNER_EMAIL = "mohamed@example.com";
+const RECOMMENDATIONS_URL = `/api/recommendations?email=${LEARNER_EMAIL}`;
+
+type Course = {
+  id: string;
+  title: string;
+  level: string;
+  unlockedBy?: string[];
+};
+
+type GraphData = {
+  learner: string;
+  completed: Course[];
+  recommendations: Course[];
+};
+
+type GraphResponse = {
+  success: boolean;
+  message?: string;
+  data?: GraphData;
+};
+
+function Header() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <header className="topbar">
+      <div className="brand">
+        <span className="brand-mark">W</span> WEXA / PATHFINDER
+      </div>
+      <div className="connection">
+        <span className="status-dot" /> LIVE GRAPH <span className="divider" />
+        COGNODB
+      </div>
+    </header>
+  );
+}
+
+function Intro() {
+  return (
+    <section className="intro">
+      <div>
+        <p className="eyebrow">PERSONAL LEARNING GRAPH</p>
+        <h1>
+          Build your next
+          <br />
+          <em>advantage.</em>
+        </h1>
+        <p className="lede">
+          Follow the shortest route from what you know to what you want to
+          master.
+        </p>
+      </div>
+      <div className="intro-note">
+        <span className="note-line" />
+        <span>
+          Recommendations are mapped from your completed courses and their
+          prerequisites.
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="error-state">
+      <strong>Graph connection interrupted</strong>
+      <span>{message}</span>
+      <button onClick={onRetry}>Retry connection</button>
+    </section>
+  );
+}
+
+function LoadingState() {
+  return (
+    <section className="loading-state" aria-live="polite">
+      <div className="loading-copy">
+        <span className="loader" />
+        <div>
+          <p className="eyebrow accent">GRAPH IN PROGRESS</p>
+          <h2>Mapping your next move</h2>
+          <p>
+            Following completed courses through their prerequisite
+            relationships.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+      <div className="loading-grid" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+    </section>
+  );
+}
+
+function Stats({ graph }: { graph: GraphData }) {
+  const stats = [
+    {
+      label: "COMPLETED",
+      value: graph.completed.length,
+      detail: "courses in your trail",
+    },
+    {
+      label: "NEXT MOVES",
+      value: graph.recommendations.length,
+      detail: "paths unlocked for you",
+    },
+  ];
+
+  return (
+    <section className="stats-row">
+      {stats.map((stat) => (
+        <div key={stat.label}>
+          <span className="stat-label">{stat.label}</span>
+          <strong>{stat.value}</strong>
+          <span>{stat.detail}</span>
         </div>
+      ))}
+      <div>
+        <span className="stat-label">GRAPH DEPTH</span>
+        <strong>
+          2<span className="unit"> hops</span>
+        </strong>
+        <span>of relationship context</span>
+      </div>
+    </section>
+  );
+}
+
+function TrailPanel({ completed }: { completed: Course[] }) {
+  return (
+    <div className="panel trail-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">01 / YOUR TRAIL</p>
+          <h2>What you have in motion</h2>
+        </div>
+        <span className="count-chip">{completed.length} complete</span>
+      </div>
+      <div className="trail-list">
+        {completed.map((course, index) => (
+          <div className="trail-item" key={course.id}>
+            <span className="trail-index">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <div>
+              <strong>{course.title}</strong>
+              <span>{course.level} / completed</span>
+            </div>
+            <span className="check">OK</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecommendationsPanel({
+  recommendations,
+  selectedCourse,
+  completingCourse,
+  onRefresh,
+  onComplete,
+}: {
+  recommendations: Course[];
+  selectedCourse: string;
+  completingCourse: string;
+  onRefresh: () => void;
+  onComplete: (courseId: string) => void;
+}) {
+  return (
+    <div className="panel next-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow accent">02 / GRAPH SIGNAL</p>
+          <h2>Your next best moves</h2>
+        </div>
+        <button
+          className="refresh"
+          onClick={onRefresh}
+          aria-label="Refresh recommendations"
+        >
+          Refresh
+        </button>
+      </div>
+      <div className="recommendation-list">
+        {recommendations.length ? (
+          recommendations.map((course) => (
+            <article
+              className={`recommendation ${selectedCourse === course.id ? "selected" : ""}`}
+              key={course.id}
+            >
+              <div className="course-top">
+                <span className="course-id">{course.id.toUpperCase()}</span>
+                <span className="level">{course.level}</span>
+              </div>
+              <h3>{course.title}</h3>
+              <p>
+                Unlocked by <strong>{course.unlockedBy?.join(" + ")}</strong>
+              </p>
+              <button
+                className="explore"
+                onClick={() => onComplete(course.id)}
+                disabled={completingCourse === course.id}
+              >
+                {completingCourse === course.id
+                  ? "Updating..."
+                  : "Mark complete"}
+                <span>Go</span>
+              </button>
+            </article>
+          ))
+        ) : (
+          <div className="empty-state">
+            Complete a course to reveal your next move.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [graph, setGraph] = useState<GraphData>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [completingCourse, setCompletingCourse] = useState("");
+
+  async function loadRecommendations() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(RECOMMENDATIONS_URL);
+      const payload = (await response.json()) as GraphResponse;
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(
+          payload.message ?? "Unable to load the learning graph.",
+        );
+      }
+      setGraph(payload.data);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to load the learning graph.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completeCourse(courseId: string) {
+    setCompletingCourse(courseId);
+    setError("");
+    try {
+      const response = await fetch("/api/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: LEARNER_EMAIL, courseId }),
+      });
+      const payload = (await response.json()) as GraphResponse;
+      if (!response.ok || !payload.success) {
+        throw new Error(
+          payload.message ?? "Could not update your learning trail.",
+        );
+      }
+      setSelectedCourse(courseId);
+      await loadRecommendations();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Could not update your learning trail.",
+      );
+    } finally {
+      setCompletingCourse("");
+    }
+  }
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => void loadRecommendations(), 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
+
+  return (
+    <div className="app-shell">
+      <Header />
+      <main className="dashboard">
+        <Intro />
+        {error ? (
+          <ErrorState
+            message={error}
+            onRetry={() => void loadRecommendations()}
+          />
+        ) : loading ? (
+          <LoadingState />
+        ) : graph ? (
+          <>
+            <Stats graph={graph} />
+            <section className="content-grid">
+              <TrailPanel completed={graph.completed} />
+              <RecommendationsPanel
+                recommendations={graph.recommendations}
+                selectedCourse={selectedCourse}
+                completingCourse={completingCourse}
+                onRefresh={() => void loadRecommendations()}
+                onComplete={(courseId) => void completeCourse(courseId)}
+              />
+            </section>
+          </>
+        ) : null}
       </main>
+      <footer>
+        <span>PATHFINDER</span>
+        <span>Powered by relationships, not rows.</span>
+        <span>v1.0 / 2026</span>
+      </footer>
     </div>
   );
 }

@@ -17,10 +17,12 @@ const recommendationsQuery = `
   WHERE NOT nextCourse.id IN enrolledIds
   OPTIONAL MATCH (nextCourse)-[:REQUIRES]->(prerequisite:Course)
   WHERE prerequisite IN completedCourses
+  OPTIONAL MATCH (nextCourse)-[:REQUIRES]->(required:Course)
   RETURN DISTINCT nextCourse.id AS id,
     nextCourse.title AS title,
     nextCourse.level AS level,
     collect(DISTINCT completed.title) AS unlockedBy,
+    collect(DISTINCT required.title) AS requirements,
     count(DISTINCT prerequisite) AS completedPrerequisites
 `;
 
@@ -55,6 +57,7 @@ export async function GET(request: Request) {
     const recommendations = recommendationResult.records.map((record) => ({
       ...toCourse(record),
       unlockedBy: record.get("unlockedBy") as string[],
+      requirements: record.get("requirements") as string[],
       completedPrerequisites: record.get("completedPrerequisites").toNumber(),
     }));
 

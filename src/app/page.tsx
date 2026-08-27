@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-const LEARNER_EMAIL = "mohamed@example.com";
-const RECOMMENDATIONS_URL = `/api/recommendations?email=${LEARNER_EMAIL}`;
+const DEFAULT_LEARNER_EMAIL = "mohamed@example.com";
 
 type Course = {
   id: string;
   title: string;
   level: string;
   unlockedBy?: string[];
+  requirements?: string[];
+  completedPrerequisites?: number;
 };
 
 type GraphData = {
@@ -23,6 +24,18 @@ type GraphResponse = {
   message?: string;
   data?: GraphData;
 };
+
+type Learner = { email: string; name: string };
+type LearnersResponse = { success: boolean; data?: Learner[] };
+
+async function fetchLearners() {
+  const response = await fetch("/api/users");
+  const payload = (await response.json()) as LearnersResponse;
+  if (!response.ok || !payload.success || !payload.data) {
+    throw new Error("Unable to load learners.");
+  }
+  return payload.data;
+}
 
 function Header() {
   return (
@@ -61,6 +74,40 @@ function Intro() {
         </span>
       </div>
     </section>
+  );
+}
+
+function LearnerPicker({
+  learners,
+  selectedEmail,
+  onChange,
+}: {
+  learners: Learner[];
+  selectedEmail: string;
+  onChange: (email: string) => void;
+}) {
+  const selectedLearner = learners.find(
+    (learner) => learner.email === selectedEmail,
+  );
+
+  return (
+    <div className="learner-picker">
+      <label htmlFor="learner">VIEWING PATH FOR</label>
+      <select
+        id="learner"
+        value={selectedEmail}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {learners.map((learner) => (
+          <option key={learner.email} value={learner.email}>
+            {learner.name}
+          </option>
+        ))}
+      </select>
+      <span className="profile-context">
+        {selectedLearner?.email ?? selectedEmail}
+      </span>
+    </div>
   );
 }
 
@@ -138,7 +185,13 @@ function Stats({ graph }: { graph: GraphData }) {
   );
 }
 
-function TrailPanel({ completed }: { completed: Course[] }) {
+function TrailPanel({
+  completed,
+  recommendations,
+}: {
+  completed: Course[];
+  recommendations: Course[];
+}) {
   return (
     <div className="panel trail-panel">
       <div className="panel-heading">
@@ -158,9 +211,79 @@ function TrailPanel({ completed }: { completed: Course[] }) {
               <strong>{course.title}</strong>
               <span>{course.level} / completed</span>
             </div>
-            <span className="check">OK</span>
+            <div className="trail-result">
+              <span className="check">COMPLETE</span>
+              <span>
+                {
+                  recommendations.filter((recommendation) =>
+                    recommendation.unlockedBy?.includes(course.title),
+                  ).length
+                }{" "}
+                paths unlocked
+              </span>
+            </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PathMap({ graph }: { graph: GraphData }) {
+  const completed = graph.completed.slice(0, 3);
+  const recommendations = graph.recommendations.slice(0, 3);
+
+  return (
+    <section className="path-map" aria-label="Learning path relationship map">
+      <div className="path-map-heading">
+        <p className="eyebrow">03 / RELATIONSHIP MAP</p>
+        <span>Completed courses unlock the next layer</span>
+      </div>
+      <div className="path-map-flow">
+        <div className="map-column">
+          <span className="map-label">YOUR FOUNDATION</span>
+          {completed.map((course) => (
+            <div className="map-node completed-node" key={course.id}>
+              <span>{course.id.toUpperCase()}</span>
+              <strong>{course.title}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="map-connector" aria-hidden="true">
+          <span>REQUIRES</span>
+        </div>
+        <div className="map-column">
+          <span className="map-label">UNLOCKED NEXT</span>
+          {recommendations.map((course) => (
+            <div className="map-node next-node" key={course.id}>
+              <span>{course.id.toUpperCase()}</span>
+              <strong>{course.title}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RequirementStatus({ course }: { course: Course }) {
+  const requiredCount = course.requirements?.length ?? 0;
+  const completedCount = course.completedPrerequisites ?? 0;
+  const completion = requiredCount ? (completedCount / requiredCount) * 100 : 0;
+
+  return (
+    <div className="requirement-status">
+      <div className="requirement-header">
+        <span>REQUIREMENT STATUS</span>
+        <strong>
+          {completedCount} of {requiredCount} ready
+        </strong>
+      </div>
+      <div
+        className="requirement-track"
+        aria-label={`${completedCount} of ${requiredCount} requirements complete`}
+      >
+        <span style={{ width: `${completion}%` }} />
       </div>
     </div>
   );
@@ -209,6 +332,10 @@ function RecommendationsPanel({
               <p>
                 Unlocked by <strong>{course.unlockedBy?.join(" + ")}</strong>
               </p>
+              <p className="requirements">
+                Requires <strong>{course.requirements?.join(" + ")}</strong>
+              </p>
+              <RequirementStatus course={course} />
               <button
                 className="explore"
                 onClick={() => onComplete(course.id)}
@@ -233,16 +360,20 @@ function RecommendationsPanel({
 
 export default function Home() {
   const [graph, setGraph] = useState<GraphData>();
+  const [learners, setLearners] = useState<Learner[]>([]);
+  const [selectedEmail, setSelectedEmail] = useState(DEFAULT_LEARNER_EMAIL);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [completingCourse, setCompletingCourse] = useState("");
 
-  async function loadRecommendations() {
+  const loadRecommendations = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(RECOMMENDATIONS_URL);
+      const response = await fetch(
+        `/api/recommendations?email=${encodeURIComponent(selectedEmail)}`,
+      );
       const payload = (await response.json()) as GraphResponse;
       if (!response.ok || !payload.success || !payload.data) {
         throw new Error(
@@ -259,7 +390,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedEmail]);
 
   async function completeCourse(courseId: string) {
     setCompletingCourse(courseId);
@@ -268,7 +399,7 @@ export default function Home() {
       const response = await fetch("/api/recommendations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: LEARNER_EMAIL, courseId }),
+        body: JSON.stringify({ email: selectedEmail, courseId }),
       });
       const payload = (await response.json()) as GraphResponse;
       if (!response.ok || !payload.success) {
@@ -290,15 +421,38 @@ export default function Home() {
   }
 
   useEffect(() => {
+    const learnerTimer = window.setTimeout(() => {
+      void fetchLearners()
+        .then(setLearners)
+        .catch((reason: unknown) => {
+          console.error("Unable to load learners", reason);
+        });
+    }, 0);
+    return () => {
+      window.clearTimeout(learnerTimer);
+    };
+  }, []);
+
+  useEffect(() => {
     const loadTimer = window.setTimeout(() => void loadRecommendations(), 0);
     return () => window.clearTimeout(loadTimer);
-  }, []);
+  }, [loadRecommendations]);
 
   return (
     <div className="app-shell">
       <Header />
       <main className="dashboard">
         <Intro />
+        {learners.length > 0 && (
+          <LearnerPicker
+            learners={learners}
+            selectedEmail={selectedEmail}
+            onChange={(email) => {
+              setSelectedEmail(email);
+              setGraph(undefined);
+            }}
+          />
+        )}
         {error ? (
           <ErrorState
             message={error}
@@ -309,8 +463,12 @@ export default function Home() {
         ) : graph ? (
           <>
             <Stats graph={graph} />
+            <PathMap graph={graph} />
             <section className="content-grid">
-              <TrailPanel completed={graph.completed} />
+              <TrailPanel
+                completed={graph.completed}
+                recommendations={graph.recommendations}
+              />
               <RecommendationsPanel
                 recommendations={graph.recommendations}
                 selectedCourse={selectedCourse}

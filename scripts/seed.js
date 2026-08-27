@@ -72,6 +72,15 @@ async function seedDatabase() {
       CREATE (user:User {email: 'mohamed@example.com', name: 'Mohamed'})
       CREATE (user)-[:ENROLLED_IN {status: 'completed'}]->(html)
       CREATE (user)-[:ENROLLED_IN {status: 'completed'}]->(js)
+
+      CREATE (sara:User {email: 'sara@example.com', name: 'Sara'})
+      CREATE (sara)-[:ENROLLED_IN {status: 'completed'}]->(html)
+      CREATE (sara)-[:ENROLLED_IN {status: 'completed'}]->(js)
+      CREATE (sara)-[:ENROLLED_IN {status: 'completed'}]->(react)
+
+      CREATE (omar:User {email: 'omar@example.com', name: 'Omar'})
+      CREATE (omar)-[:ENROLLED_IN {status: 'completed'}]->(js)
+      CREATE (omar)-[:ENROLLED_IN {status: 'completed'}]->(node)
     `;
 
     await session.run(seedQuery);

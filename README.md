@@ -30,14 +30,14 @@ WHERE NOT (u)-[:ENROLLED_IN]->(nextCourse)
 RETURN nextCourse
 ```
 
-The production query also filters on `status = 'completed'`, returns the completed course that unlocked each result, and uses `$email` as a driver parameter. This is the graph-specific part of the application: it finds reachable next moves through relationships rather than copying a fixed course list into application code. The same route accepts `POST` with `{ email, courseId }` to `MERGE` a completed `ENROLLED_IN` relationship, then the UI reloads the traversal.
+The production query also filters on `status = 'completed'`, returns the completed course that unlocked each result, and uses `$email` as a driver parameter. This is the graph-specific part of the application: it finds reachable next moves through relationships rather than copying a fixed course list into application code. The same route accepts `POST` with `{ email, courseId }` to `MERGE` a completed `ENROLLED_IN` relationship, then the UI reloads the traversal. The seed includes three learners with different paths, and the dashboard selector demonstrates how each user's subgraph produces different recommendations. In production, the selected email would come from an authenticated session rather than a public selector.
 
 ## Run locally
 
 1. Create an account at [CognoDB Cloud](https://console.cognodb.com/signup), choose **Create instance**, select the free `c0` tier and a region, then wait for provisioning to finish.
 2. Copy the `bolt+s://...databases.cognodb.cloud` URI and the generated password for the `cognodb` user immediately. The password is shown once.
 3. Create `.env.local` from `.env.example` and fill in the three values. Never commit `.env.local`.
-4. Install dependencies and load the sample graph (12 courses, 5 skills, and 12 prerequisite relationships):
+4. Install dependencies and load the sample graph (12 courses, 5 skills, 12 prerequisite relationships, and 3 learners):
 
 ```bash
 npm install
